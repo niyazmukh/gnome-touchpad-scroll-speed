@@ -1,0 +1,79 @@
+diff --git a/src/backends/native/meta-seat-impl.c b/src/backends/native/meta-seat-impl.c
+index eb7b308..e5e7af8 100644
+--- a/src/backends/native/meta-seat-impl.c
++++ b/src/backends/native/meta-seat-impl.c
+@@ -63,6 +63,7 @@
+ #define AUTOREPEAT_VALUE 2
+ 
+ #define DISCRETE_SCROLL_STEP 10.0
++#define TOUCHPAD_SCROLL_MULTIPLIER_ENV "MUTTER_TOUCHPAD_SCROLL_MULTIPLIER"
+ 
+ #ifndef BTN_STYLUS3
+ #define BTN_STYLUS3 0x149 /* Linux 4.15 */
+@@ -128,6 +129,31 @@ void meta_seat_impl_filter_relative_motion (MetaSeatImpl       *seat_impl,
+                                             float              *dy);
+ void meta_seat_impl_clear_repeat_source (MetaSeatImpl *seat_impl);
+ 
++static double
++meta_seat_impl_get_touchpad_scroll_multiplier (void)
++{
++  const char *value;
++  char *end = NULL;
++  double multiplier;
++
++  value = g_getenv (TOUCHPAD_SCROLL_MULTIPLIER_ENV);
++  if (!value || !*value)
++    return 1.0;
++
++  errno = 0;
++  multiplier = g_ascii_strtod (value, &end);
++
++  if (errno != 0 || end == value || *end != '\0' || multiplier <= 0.0)
++    {
++      g_warning ("%s must be a positive number, got '%s'; using 1.0",
++                 TOUCHPAD_SCROLL_MULTIPLIER_ENV,
++                 value);
++      return 1.0;
++    }
++
++  return multiplier;
++}
++
+ void
+ meta_seat_impl_run_input_task (MetaSeatImpl *seat_impl,
+                                GTask        *task,
+@@ -1983,6 +2009,13 @@ notify_continuous_axis (MetaSeatImpl                  *seat_impl,
+         finish_flags |= CLUTTER_SCROLL_FINISHED_VERTICAL;
+     }
+ 
++  if (scroll_source == CLUTTER_SCROLL_SOURCE_FINGER &&
++      seat_impl->touchpad_scroll_multiplier != 1.0)
++    {
++      dx *= seat_impl->touchpad_scroll_multiplier;
++      dy *= seat_impl->touchpad_scroll_multiplier;
++    }
++
+   meta_seat_impl_notify_scroll_continuous_in_impl (seat_impl, device, time_us,
+                                                    dx, dy,
+                                                    scroll_source, finish_flags);
+@@ -3384,6 +3417,8 @@ meta_seat_impl_init (MetaSeatImpl *seat_impl)
+   seat_impl->repeat = TRUE;
+   seat_impl->repeat_delay = 250;     /* ms */
+   seat_impl->repeat_interval = 33;   /* ms */
++  seat_impl->touchpad_scroll_multiplier =
++    meta_seat_impl_get_touchpad_scroll_multiplier ();
+ 
+   g_mutex_init (&seat_impl->init_mutex);
+   g_cond_init (&seat_impl->init_cond);
+diff --git a/src/backends/native/meta-seat-impl.h b/src/backends/native/meta-seat-impl.h
+index fa8b201..c43b6ea 100644
+--- a/src/backends/native/meta-seat-impl.h
++++ b/src/backends/native/meta-seat-impl.h
+@@ -118,6 +118,7 @@ struct _MetaSeatImpl
+   /* Emulation of discrete scroll events out of smooth ones */
+   float accum_scroll_dx;
+   float accum_scroll_dy;
++  double touchpad_scroll_multiplier;
+ 
+   gboolean released;
+ };

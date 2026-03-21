@@ -1,0 +1,11 @@
+*.deb
+*.ddeb
+*.buildinfo
+*.changes
+*.orig.tar.*
+*.tar.*
+*.diff.gz
+*.swp
+*.swo
+*~
+.DS_Store

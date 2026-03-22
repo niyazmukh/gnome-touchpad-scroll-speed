@@ -6,8 +6,9 @@ PATCH_FILE="${REPO_DIR}/mutter-touchpad-scroll.patch"
 HELPER_SRC="${REPO_DIR}/set-touchpad-scroll-speed.sh"
 HELPER_DEST="${HOME}/.local/bin/gnome-touchpad-scroll-speed"
 BUILD_ROOT="${TMPDIR:-/tmp}/gnome-touchpad-scroll-build"
-EXPECTED_VERSION="46.2-1ubuntu0.24.04.14"
-LOCAL_VERSION="${EXPECTED_VERSION}+touchpad1"
+SUPPORTED_VERSION_REGEX='^46\.2-1ubuntu0\.24\.04\.[0-9]+([+~].*)?$'
+SOURCE_VERSION=""
+LOCAL_VERSION=""
 DEFAULT_MULTIPLIER="0.70"
 
 usage() {
@@ -31,7 +32,7 @@ What it does:
   - sets the initial touchpad scroll multiplier
 
 Notes:
-  - this installer currently targets Ubuntu 24.04 with Mutter 46.2-1ubuntu0.24.04.14
+  - this installer currently supports Ubuntu 24.04 Mutter 46.2-1ubuntu0.24.04.*
   - it requires sudo for apt and package installation
   - you still need to log out and back in after installation
 EOF
@@ -72,13 +73,11 @@ ensure_supported_mutter_version() {
   installed_version="$(dpkg-query -W -f='${Version}' libmutter-14-0 2>/dev/null || true)"
   [[ -n "$installed_version" ]] || die "libmutter-14-0 is not installed"
 
-  case "$installed_version" in
-    "$EXPECTED_VERSION"|"$EXPECTED_VERSION"+*)
-      ;;
-    *)
-      die "installed libmutter-14-0 version is '$installed_version', but this patch targets '$EXPECTED_VERSION'"
-      ;;
-  esac
+  [[ "$installed_version" =~ $SUPPORTED_VERSION_REGEX ]] ||
+    die "installed libmutter-14-0 version is '$installed_version', but this installer supports Ubuntu 24.04 Mutter 46.2-1ubuntu0.24.04.*"
+
+  SOURCE_VERSION="${installed_version%%+*}"
+  LOCAL_VERSION="${SOURCE_VERSION}+touchpad1"
 }
 
 ensure_prereqs() {
@@ -118,10 +117,10 @@ download_source() {
   log "Installing Mutter build dependencies"
   sudo apt-get build-dep -y mutter
 
-  log "Downloading Mutter source $EXPECTED_VERSION"
+  log "Downloading Mutter source $SOURCE_VERSION"
   (
     cd "$BUILD_ROOT"
-    apt-get source "mutter=${EXPECTED_VERSION}"
+    apt-get source "mutter=${SOURCE_VERSION}"
   )
 }
 

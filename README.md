@@ -62,15 +62,17 @@ Rules:
 This repository currently targets:
 
 - Ubuntu `24.04`
-- Mutter `46.2-1ubuntu0.24.04.14`
+- Mutter `46.2-1ubuntu0.24.04.*`
 
-If your installed `libmutter-14-0` version does not match that base version,
-the installer will stop instead of trying to apply the patch blindly.
+The installer rebuilds against the currently installed Ubuntu 24.04 Mutter
+`46.2-1ubuntu0.24.04.*` base version. If your installed `libmutter-14-0`
+version is outside that patch line, the installer stops instead of trying to
+apply the patch blindly.
 
 ## Files
 
 - `install.sh`
-  Full installer for Ubuntu 24.04
+  Full installer for Ubuntu 24.04 Mutter `46.2-1ubuntu0.24.04.*`
 - `mutter-touchpad-scroll.patch`
   The actual Mutter source patch
 - `set-touchpad-scroll-speed.sh`

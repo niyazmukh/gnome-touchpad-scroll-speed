@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_CONF_DIR="${HOME}/.config/environment.d"
-ENV_CONF_FILE="${ENV_CONF_DIR}/90-mutter-touchpad-scroll.conf"
 UNIT_DIR="${HOME}/.config/systemd/user/org.gnome.Shell@wayland.service.d"
 UNIT_FILE="${UNIT_DIR}/90-touchpad-scroll.conf"
 ENV_NAME="MUTTER_TOUCHPAD_SCROLL_MULTIPLIER"
@@ -44,11 +42,11 @@ fi
 
 case "$1" in
   --unset)
-    rm -f "$ENV_CONF_FILE" "$UNIT_FILE"
+    rm -f "$UNIT_FILE"
     rmdir --ignore-fail-on-non-empty "$UNIT_DIR" 2>/dev/null || true
     systemctl --user daemon-reload >/dev/null 2>&1 || true
-    printf 'Removed %s and %s. Log out and back in to restore the default scroll speed.\n' \
-      "$ENV_CONF_FILE" "$UNIT_FILE"
+    printf 'Removed %s. Log out and back in to restore the default scroll speed.\n' \
+      "$UNIT_FILE"
     exit 0
     ;;
   -h|--help)
@@ -58,8 +56,7 @@ case "$1" in
 esac
 
 validate_multiplier "$1"
-mkdir -p "$ENV_CONF_DIR" "$UNIT_DIR"
-printf '%s=%s\n' "$ENV_NAME" "$1" > "$ENV_CONF_FILE"
+mkdir -p "$UNIT_DIR"
 cat > "$UNIT_FILE" <<EOF
 [Service]
 Environment=${ENV_NAME}=$1
@@ -68,7 +65,6 @@ systemctl --user daemon-reload >/dev/null 2>&1 || true
 
 cat <<EOF
 Saved $ENV_NAME=$1 to:
-  $ENV_CONF_FILE
   $UNIT_FILE
 Log out and back in for GNOME Shell to pick up the new touchpad scroll speed.
 EOF

@@ -178,6 +178,7 @@ install_helper() {
   log "Installing helper command to $HELPER_DEST"
   mkdir -p "$(dirname "$HELPER_DEST")"
   install -m 0755 "$HELPER_SRC" "$HELPER_DEST"
+  rm -f "${HOME}/.config/environment.d/90-mutter-touchpad-scroll.conf"
 }
 
 apply_multiplier() {

@@ -97,7 +97,6 @@ MUTTER_TOUCHPAD_SCROLL_MULTIPLIER=0.70
 On Ubuntu GNOME Wayland, the helper writes:
 
 - `~/.config/systemd/user/org.gnome.Shell@wayland.service.d/90-touchpad-scroll.conf`
-- `~/.config/environment.d/90-mutter-touchpad-scroll.conf`
 
 The GNOME Shell systemd user-service override is the one that matters.
 

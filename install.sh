@@ -6,7 +6,9 @@ PATCH_FILE="${REPO_DIR}/mutter-touchpad-scroll.patch"
 HELPER_SRC="${REPO_DIR}/set-touchpad-scroll-speed.sh"
 HELPER_DEST="${HOME}/.local/bin/gnome-touchpad-scroll-speed"
 BUILD_ROOT="${TMPDIR:-/tmp}/gnome-touchpad-scroll-build"
-SUPPORTED_VERSION_REGEX='^46\.2-1ubuntu0\.24\.04\.[0-9]+([+~].*)?$'
+UBUNTU_VERSION_ID=""
+MUTTER_RUNTIME_PACKAGE=""
+MUTTER_SLOT=""
 SOURCE_VERSION=""
 LOCAL_VERSION=""
 DEFAULT_MULTIPLIER="0.70"
@@ -32,7 +34,8 @@ What it does:
   - sets the initial touchpad scroll multiplier
 
 Notes:
-  - this installer currently supports Ubuntu 24.04 Mutter 46.2-1ubuntu0.24.04.*
+  - this installer is intended for Ubuntu 24.04 and newer
+  - newer Ubuntu/Mutter releases are best-effort, not guaranteed
   - it requires sudo for apt and package installation
   - you still need to log out and back in after installation
 EOF
@@ -64,20 +67,42 @@ ensure_supported_os() {
   source /etc/os-release
 
   [[ "${ID:-}" == "ubuntu" ]] || die "this installer currently supports Ubuntu only"
-  [[ "${VERSION_ID:-}" == "24.04" ]] || die "this installer currently supports Ubuntu 24.04 only"
+  [[ -n "${VERSION_ID:-}" ]] || die "Ubuntu VERSION_ID is missing"
+  dpkg --compare-versions "$VERSION_ID" ge "24.04" ||
+    die "this installer currently supports Ubuntu 24.04 and newer"
+  UBUNTU_VERSION_ID="$VERSION_ID"
 }
 
-ensure_supported_mutter_version() {
-  local installed_version
+detect_installed_mutter() {
+  local best_pkg=""
+  local best_ver=""
+  local pkg
+  local ver
 
-  installed_version="$(dpkg-query -W -f='${Version}' libmutter-14-0 2>/dev/null || true)"
-  [[ -n "$installed_version" ]] || die "libmutter-14-0 is not installed"
+  while IFS=$'\t' read -r pkg ver; do
+    [[ -n "$pkg" && -n "$ver" ]] || continue
 
-  [[ "$installed_version" =~ $SUPPORTED_VERSION_REGEX ]] ||
-    die "installed libmutter-14-0 version is '$installed_version', but this installer supports Ubuntu 24.04 Mutter 46.2-1ubuntu0.24.04.*"
+    if [[ -z "$best_ver" ]] || dpkg --compare-versions "$ver" gt "$best_ver"; then
+      best_pkg="$pkg"
+      best_ver="$ver"
+    fi
+  done < <(dpkg-query -W -f='${Package}\t${Version}\n' 'libmutter-*-0' 2>/dev/null)
 
-  SOURCE_VERSION="${installed_version%%+*}"
+  [[ -n "$best_pkg" ]] || die "could not detect an installed libmutter runtime package"
+
+  MUTTER_RUNTIME_PACKAGE="$best_pkg"
+  MUTTER_SLOT="${best_pkg#libmutter-}"
+  MUTTER_SLOT="${MUTTER_SLOT%-0}"
+  SOURCE_VERSION="${best_ver%%+*}"
   LOCAL_VERSION="${SOURCE_VERSION}+touchpad1"
+
+  log "Detected ${MUTTER_RUNTIME_PACKAGE} version ${best_ver}"
+  log "Using source version ${SOURCE_VERSION}"
+  log "Using mutter slot ${MUTTER_SLOT}"
+
+  if [[ "$UBUNTU_VERSION_ID" != "24.04" ]]; then
+    log "Warning: Ubuntu ${UBUNTU_VERSION_ID} is outside the original test target; installation is best-effort"
+  fi
 }
 
 ensure_prereqs() {
@@ -133,7 +158,7 @@ prepare_source_tree() {
   (
     cd "$source_dir"
     patch -p1 < "$PATCH_FILE"
-  )
+  ) || die "the patch did not apply cleanly to mutter ${SOURCE_VERSION}; this Ubuntu/Mutter combination likely needs a refreshed patch"
 
   log "Adding local changelog entry"
   (
@@ -163,8 +188,8 @@ build_packages() {
 
 install_packages() {
   local debs=(
-    "$BUILD_ROOT"/gir1.2-mutter-14_"$LOCAL_VERSION"_*.deb
-    "$BUILD_ROOT"/libmutter-14-0_"$LOCAL_VERSION"_*.deb
+    "$BUILD_ROOT"/gir1.2-mutter-"$MUTTER_SLOT"_"$LOCAL_VERSION"_*.deb
+    "$BUILD_ROOT"/libmutter-"$MUTTER_SLOT"-0_"$LOCAL_VERSION"_*.deb
     "$BUILD_ROOT"/mutter-common_"$LOCAL_VERSION"_*.deb
     "$BUILD_ROOT"/mutter-common-bin_"$LOCAL_VERSION"_*.deb
   )
@@ -215,7 +240,7 @@ main() {
 
   validate_multiplier "$multiplier"
   ensure_supported_os
-  ensure_supported_mutter_version
+  detect_installed_mutter
   ensure_prereqs
   enable_source_repos
   prepare_build_root

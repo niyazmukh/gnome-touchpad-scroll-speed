@@ -1,29 +1,92 @@
-# Mutter Touchpad Scroll Patch
+# gnome-touchpad-scroll-speed
 
-This repository contains a narrow Ubuntu GNOME Wayland patch for changing
-two-finger touchpad scroll speed system-wide.
+Ubuntu GNOME Wayland patch for changing two-finger touchpad scroll speed
+system-wide.
 
-The patch is designed to affect touchpad finger scrolling only. It does not
-change mouse wheel scrolling, TrackPoint scrolling, pointer acceleration, or
-touchpad swipe and pinch gestures.
+The patch changes touchpad finger scrolling only. It does not change:
 
-## Scope
+- mouse wheel scrolling
+- TrackPoint / pointing stick scrolling
+- pointer acceleration
+- swipe gestures
+- pinch gestures
 
-The code change applies a multiplier only when Mutter handles:
+## Quick Install
+
+```bash
+git clone https://github.com/niyazmukh/gnome-touchpad-scroll-speed ~/Repos/mutter-touchpad-scroll-speed && \
+cd ~/Repos/mutter-touchpad-scroll-speed && \
+./install.sh --multiplier 0.70
+```
+
+What the installer does:
+
+- enables Ubuntu source repositories if needed
+- installs Mutter build dependencies
+- downloads the supported Ubuntu Mutter source package
+- applies the patch
+- builds and installs the patched runtime packages
+- installs a helper command at `~/.local/bin/gnome-touchpad-scroll-speed`
+- sets the initial multiplier
+
+After installation:
+
+1. log out
+2. log back in
+
+## Adjust Later
+
+After install, use:
+
+```bash
+~/.local/bin/gnome-touchpad-scroll-speed 0.70
+```
+
+Examples:
+
+```bash
+~/.local/bin/gnome-touchpad-scroll-speed 0.50
+~/.local/bin/gnome-touchpad-scroll-speed 1.20
+~/.local/bin/gnome-touchpad-scroll-speed --unset
+```
+
+Rules:
+
+- `1.0` is the default behavior
+- below `1.0` is slower
+- above `1.0` is faster
+- changes take effect after logout/login
+
+## Supported Version
+
+This repository currently targets:
+
+- Ubuntu `24.04`
+- Mutter `46.2-1ubuntu0.24.04.14`
+
+If your installed `libmutter-14-0` version does not match that base version,
+the installer will stop instead of trying to apply the patch blindly.
+
+## Files
+
+- `install.sh`
+  Full installer for Ubuntu 24.04
+- `mutter-touchpad-scroll.patch`
+  The actual Mutter source patch
+- `set-touchpad-scroll-speed.sh`
+  Helper for changing the multiplier after installation
+
+## Technical Scope
+
+The code path is intentionally narrow. The multiplier is applied only when
+Mutter handles:
 
 - `LIBINPUT_EVENT_POINTER_SCROLL_FINGER`
 - `CLUTTER_SCROLL_SOURCE_FINGER`
 
-Everything else stays on the stock path.
+Everything else stays on the normal path.
 
-## Files
-
-- `mutter-touchpad-scroll.patch`
-  Patch against Ubuntu `mutter` `46.2-1ubuntu0.24.04.14`
-- `set-touchpad-scroll-speed.sh`
-  Helper that persists the runtime multiplier for GNOME Shell on Wayland
-
-## Runtime Setting
+## Runtime Integration
 
 The patch reads:
 
@@ -31,29 +94,15 @@ The patch reads:
 MUTTER_TOUCHPAD_SCROLL_MULTIPLIER=0.70
 ```
 
-Values below `1.0` slow two-finger scrolling. Values above `1.0` speed it up.
-
-## Ubuntu Notes
-
-On this Ubuntu GNOME setup, the helper writes:
+On Ubuntu GNOME Wayland, the helper writes:
 
 - `~/.config/systemd/user/org.gnome.Shell@wayland.service.d/90-touchpad-scroll.conf`
 - `~/.config/environment.d/90-mutter-touchpad-scroll.conf`
 
-The GNOME Shell systemd user-service override is the important one. The generic
-environment file is kept as a fallback.
+The GNOME Shell systemd user-service override is the one that matters.
 
-## Build Outline
+## Why This Design
 
-1. Check out Ubuntu's Mutter source matching the installed package version.
-2. Apply `mutter-touchpad-scroll.patch`.
-3. Install the package build dependencies.
-4. Build the package.
-5. Install the rebuilt Mutter runtime packages.
-6. Run `set-touchpad-scroll-speed.sh <multiplier>`.
-7. Log out and back in.
-
-## Design Choice
-
-The patch uses an environment variable instead of adding a GSettings key. That
-keeps the change small and avoids schema, UI, and settings-daemon churn.
+This patch uses an environment variable instead of introducing a GNOME UI or a
+new GSettings key. That keeps the change small and local to Mutter, avoids
+schema churn, and reduces the risk of touching unrelated input behavior.
